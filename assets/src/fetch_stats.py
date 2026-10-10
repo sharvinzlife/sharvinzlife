@@ -13,12 +13,6 @@ from datetime import date
 
 OUT = "assets/src/stats.json"
 
-CONTRIBUTIONS_QUERY = (
-    "query($from:DateTime!,$to:DateTime!){"
-    "viewer{contributionsCollection(from:$from,to:$to){"
-    "totalCommitContributions restrictedContributionsCount}}}"
-)
-
 
 def run_gh(args):
     proc = subprocess.run(["gh", *args], capture_output=True, text=True)
@@ -69,15 +63,18 @@ def loc_for(repo, run=run_gh):
     raise RuntimeError(f"{repo}: stats not ready")
 
 
-def _contributions(run, year):
-    out = run([
-        "api", "graphql",
-        "-f", f"query={CONTRIBUTIONS_QUERY}",
-        "-f", f"from={year}-01-01T00:00:00Z",
-        "-f", f"to={year}-12-31T23:59:59Z",
-    ])
-    collection = json.loads(out)["data"]["viewer"]["contributionsCollection"]
-    return collection["totalCommitContributions"] + collection["restrictedContributionsCount"]
+def commits_for(repo, size, run=run_gh):
+    if size == 0:
+        return 0
+    out = run(["api", "-i", f"repos/sharvinzlife/{repo}/commits?per_page=1"])
+    status = _status(out)
+    if status != 200:
+        raise RuntimeError(f"{repo}: unexpected HTTP {status}")
+    headers = out.replace("\r\n", "\n").split("\n\n", 1)[0]
+    m = re.search(r'page=(\d+)>;\s*rel="last"', headers, re.IGNORECASE)
+    if m:
+        return int(m.group(1))
+    return len(json.loads(_body(out) or "[]"))
 
 
 def fetch_stats(run=run_gh, today=None):
@@ -87,8 +84,7 @@ def fetch_stats(run=run_gh, today=None):
         run(["api", "user/repos?per_page=100&affiliation=owner", "--paginate"])
     ) if not r.get("fork")]
     commits = sum(
-        _contributions(run, year)
-        for year in range(int(user["created_at"][:4]), today.year + 1)
+        commits_for(r["name"], r.get("size", 0), run=run) for r in owned
     )
     return {
         "repos": len(owned),

@@ -19,13 +19,6 @@ FIXTURE = {
 }
 
 
-def luma(hexcol):
-    r = int(hexcol[1:3], 16)
-    gg = int(hexcol[3:5], 16)
-    b = int(hexcol[5:7], 16)
-    return 0.299 * r + 0.587 * gg + 0.114 * b
-
-
 def local_tag(el):
     return el.tag.split("}")[-1]
 
@@ -33,24 +26,23 @@ def local_tag(el):
 class AsciiPortraitTests(unittest.TestCase):
     def test_shape_and_background(self):
         portrait = g.ascii_portrait()
-        self.assertEqual(len(portrait), 30)
+        self.assertEqual(len(portrait), 60)
         for row in portrait:
-            self.assertEqual(len(row), 56)
+            self.assertEqual(len(row), 110)
             for cell in row:
                 self.assertEqual(len(cell), 2)
                 ch, col = cell
                 if col is None:
                     self.assertEqual(ch, " ")
                 else:
-                    self.assertRegex(col, r"^#[0-9a-f]{6}$")
+                    self.assertEqual(col, g.WHITE)
+                    self.assertIn(ch, g.RAMP_INV)
         self.assertEqual(portrait[0][0], (" ", None))
 
-    def test_non_background_is_lifted_and_inked(self):
-        for row in g.ascii_portrait():
-            for ch, col in row:
-                if col is not None:
-                    self.assertNotEqual(ch, " ")
-                    self.assertGreaterEqual(luma(col), 70)
+    def test_at_least_a_quarter_is_inked(self):
+        cells = [cell for row in g.ascii_portrait() for cell in row]
+        inked = [cell for cell in cells if cell[1] is not None]
+        self.assertGreaterEqual(len(inked), len(cells) * 0.25)
 
 
 class UptimeTests(unittest.TestCase):
@@ -129,6 +121,38 @@ class LocForTests(unittest.TestCase):
         with mock.patch.object(f.time, "sleep", lambda s: None):
             with self.assertRaises(RuntimeError) as cm:
                 f.loc_for("demo", run=fake)
+        self.assertIn("demo", str(cm.exception))
+
+
+class CommitsForTests(unittest.TestCase):
+    def test_link_header_last_page(self):
+        def fake(args):
+            return (
+                "HTTP/2.0 200 OK\n"
+                "link: <https://api.github.com/repositories/1/commits?per_page=1&page=2774>; "
+                'rel="last"\n\n[{"sha": "a"}]'
+            )
+
+        self.assertEqual(f.commits_for("demo", 100, run=fake), 2774)
+
+    def test_no_link_header_counts_body(self):
+        def fake(args):
+            return "HTTP/2.0 200 OK\n\n[{\"sha\": \"a\"}]"
+
+        self.assertEqual(f.commits_for("demo", 100, run=fake), 1)
+
+    def test_empty_repo_skips_api(self):
+        def fake(args):
+            raise AssertionError("runner must not be called for an empty repo")
+
+        self.assertEqual(f.commits_for("demo", 0, run=fake), 0)
+
+    def test_error_status_raises_naming_repo(self):
+        def fake(args):
+            return "HTTP/2.0 404 Not Found\n\n{}"
+
+        with self.assertRaises(RuntimeError) as cm:
+            f.commits_for("demo", 100, run=fake)
         self.assertIn("demo", str(cm.exception))
 
 

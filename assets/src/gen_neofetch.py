@@ -15,17 +15,19 @@ BG, PANE = "#04060b", "#070d16"
 FRAME, MUTED = "#16405e", "#5b768c"
 CYAN, WHITE = "#22d3ee", "#e6edf3"
 
-RAMP = " .:-=+*#%@"
+RAMP_INV = "@%#*+=-:. "
 
 PORT_X = 40
-INFO_X = 480
-ROW_STEP = 14
-INFO_STEP = 18
+INFO_X = 500
+PORTRAIT_FONT = 6.5
+PORTRAIT_ROW_STEP = 7.3
 FONT = 12
+INFO_STEP = 18
 TOP = 40
 PAD = 40
 
-PORTRAIT_ROWS = 30
+PORTRAIT_ROWS = 60
+PORTRAIT_COLS = 110
 
 
 def _luma(r, g, b):
@@ -52,22 +54,8 @@ def ascii_portrait(path="assets/src/portrait.ppm"):
             if l > 200 and sat < 0.18:
                 row.append((" ", None))
                 continue
-            ch = RAMP[max(1, int(l / 256 * 10))]
-            if l < 70:
-                # Plan's lift is multiply by 70/l; that cannot reach luma 70 for
-                # black (0*l stays 0) or for saturated pixels whose bright channel
-                # clamps at 255. Fall back to a white blend only for those.
-                if l > 0:
-                    factor = 70.0 / l
-                    r = min(255.0, r * factor)
-                    g = min(255.0, g * factor)
-                    b = min(255.0, b * factor)
-                nl = _luma(r, g, b)
-                if nl < 70:
-                    t = (70.0 - nl) / (255.0 - nl)
-                    r, g, b = r + (255 - r) * t, g + (255 - g) * t, b + (255 - b) * t
-                r, g, b = math.ceil(r), math.ceil(g), math.ceil(b)
-            row.append((ch, "#%02x%02x%02x" % (r, g, b)))
+            ch = RAMP_INV[min(9, int(l / 256 * 10))]
+            row.append((ch, WHITE))
         rows.append(row)
     return rows
 
@@ -130,12 +118,12 @@ def build_svg(stats, today=date.today()):
             raise ValueError(f"stats[{key!r}] must be an int")
 
     info = _info_lines(stats, today)
-    content = max(PORTRAIT_ROWS * ROW_STEP, len(info) * INFO_STEP)
-    h = TOP + content + PAD
+    content = max(PORTRAIT_ROWS * PORTRAIT_ROW_STEP, len(info) * INFO_STEP)
+    h = TOP + math.ceil(content) + PAD
 
     portrait_svg = []
     for i, row in enumerate(ascii_portrait()):
-        y = TOP + FONT + i * ROW_STEP
+        y = TOP + PORTRAIT_FONT + i * PORTRAIT_ROW_STEP
         runs = []
         j = 0
         while j < len(row):
@@ -147,7 +135,7 @@ def build_svg(stats, today=date.today()):
             runs.append(f'<tspan fill="{col if col else "none"}">{chars}</tspan>')
             j = k
         portrait_svg.append(
-            f'<text x="{PORT_X}" y="{y}" font-family="{MONO}" font-size="{FONT}" '
+            f'<text x="{PORT_X}" y="{y}" font-family="{MONO}" font-size="{PORTRAIT_FONT}" '
             f'xml:space="preserve">{"".join(runs)}</text>'
         )
 

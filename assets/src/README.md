@@ -55,4 +55,5 @@ Re-measure before changing them.
 `fetch_stats.py` pulls repos, stars, followers, commits and lines of code through the
 authenticated `gh` CLI and writes `stats.json`; `gen_neofetch.py` turns that plus
 `portrait.ppm` into `assets/neofetch.svg`. Counts include **private** repositories —
-numbers only, no repo names. A daily launchd job in `ops/` refreshes and commits the card.
+numbers only, no repo names. Commits = commits on the default branch of every owned repo
+(any author). A daily launchd job in `ops/` refreshes and commits the card.

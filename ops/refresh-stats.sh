@@ -9,7 +9,7 @@ git -C "$dir" pull --ff-only
 ( cd "$dir" && python3 assets/src/fetch_stats.py )
 ( cd "$dir" && python3 assets/src/gen_neofetch.py )
 
-if [ -z "$(git -C "$dir" status --porcelain)" ]; then
+if git -C "$dir" diff --quiet -- assets/neofetch.svg assets/src/stats.json; then
   echo "no change"
   exit 0
 fi
