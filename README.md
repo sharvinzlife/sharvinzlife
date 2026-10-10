@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/sharvinzlife/sharvinzlife/main/assets/neofetch.svg" width="100%" alt="sharvin@streamwave — neofetch-style card: ASCII portrait, stack, hobbies, contact and live GitHub stats." />
+<picture>
+  <source media="(max-width: 700px)" srcset="https://raw.githubusercontent.com/sharvinzlife/sharvinzlife/main/assets/neofetch-narrow.svg" />
+  <img src="https://raw.githubusercontent.com/sharvinzlife/sharvinzlife/main/assets/neofetch.svg" width="100%" alt="sharvin@streamwave — neofetch-style card: ASCII portrait, stack, hobbies, contact and live GitHub stats." />
+</picture>
 
 </div>
 <br/>

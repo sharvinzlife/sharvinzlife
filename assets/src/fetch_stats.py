@@ -7,11 +7,14 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import time
 from datetime import date
 
 OUT = "assets/src/stats.json"
+
+BACKOFF = [2, 4, 8, 16, 30, 30, 30, 30]
 
 
 def run_gh(args):
@@ -47,19 +50,51 @@ def _parse_paginated(text):
     return out
 
 
-def loc_for(repo, run=run_gh):
-    for _ in range(10):
+def _cache_path():
+    return os.path.expanduser(
+        os.environ.get("PROFILE_STATS_CACHE", "~/.cache/profile-stats/loc.json")
+    )
+
+
+def _load_cache():
+    try:
+        with open(_cache_path()) as fh:
+            return json.load(fh)
+    except FileNotFoundError:
+        return {}
+
+
+def _save_cache(cache):
+    path = _cache_path()
+    directory = os.path.dirname(path)
+    os.makedirs(directory, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=directory, suffix=".tmp")
+    with os.fdopen(fd, "w") as fh:
+        json.dump(cache, fh, indent=2)
+        fh.write("\n")
+    os.replace(tmp, path)
+
+
+def loc_for(repo, run=run_gh, cache=None, warnings=None, sleep=time.sleep):
+    cache = {} if cache is None else cache
+    warnings = [] if warnings is None else warnings
+    for delay in BACKOFF:
         out = run(["api", "-i", f"repos/sharvinzlife/{repo}/stats/code_frequency"])
         status = _status(out)
         if status == 202:
-            time.sleep(3)
+            sleep(delay)
             continue
         if status == 204:
             return 0
         if status != 200:
             raise RuntimeError(f"{repo}: unexpected HTTP {status}")
         weeks = json.loads(_body(out) or "[]")
-        return sum(added + deleted for _, added, deleted in weeks)
+        value = sum(added + deleted for _, added, deleted in weeks)
+        cache[repo] = value
+        return value
+    if repo in cache:
+        warnings.append(f"{repo}: stats not ready, used cached loc {cache[repo]}")
+        return cache[repo]
     raise RuntimeError(f"{repo}: stats not ready")
 
 
@@ -77,32 +112,45 @@ def commits_for(repo, size, run=run_gh):
     return len(json.loads(_body(out) or "[]"))
 
 
-def fetch_stats(run=run_gh, today=None):
+def fetch_stats(run=run_gh, today=None, cache=None, warnings=None, sleep=time.sleep):
     today = today or date.today()
+    cache = {} if cache is None else cache
+    warnings = [] if warnings is None else warnings
     user = json.loads(run(["api", "user"]))
     owned = [r for r in _parse_paginated(
         run(["api", "user/repos?per_page=100&affiliation=owner", "--paginate"])
     ) if not r.get("fork")]
+    for r in owned:
+        run(["api", "-i", f"repos/sharvinzlife/{r['name']}/stats/code_frequency"])
     commits = sum(
         commits_for(r["name"], r.get("size", 0), run=run) for r in owned
+    )
+    loc = sum(
+        loc_for(r["name"], run=run, cache=cache, warnings=warnings, sleep=sleep)
+        for r in owned
     )
     return {
         "repos": len(owned),
         "commits": commits,
         "stars": sum(r.get("stargazers_count", 0) for r in owned),
         "followers": user["followers"],
-        "loc": sum(loc_for(r["name"], run=run) for r in owned),
+        "loc": loc,
         "generated": today.isoformat(),
     }
 
 
 def main():
-    stats = fetch_stats()
+    cache = _load_cache()
+    warnings = []
+    stats = fetch_stats(cache=cache, warnings=warnings)
+    for warning in warnings:
+        print(f"WARN {warning}", file=sys.stderr)
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(OUT), suffix=".tmp")
     with os.fdopen(fd, "w") as fh:
         json.dump(stats, fh, indent=2)
         fh.write("\n")
     os.replace(tmp, OUT)
+    _save_cache(cache)
     print(f"wrote {OUT}: {stats}")
 
 

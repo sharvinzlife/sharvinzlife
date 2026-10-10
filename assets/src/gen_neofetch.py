@@ -3,12 +3,16 @@
 
 Replaces the hero/boot banners. Reads assets/src/portrait.ppm (a pre-cropped
 P3 image) and assets/src/stats.json (written by fetch_stats.py).
+
+Two geometries share one renderer: WIDE (portrait beside the info column) for
+the README, NARROW (info stacked under the portrait) for phones.
 """
 import json
 import math
+import textwrap
+from collections import namedtuple
 from datetime import date, timedelta
 
-W = 1200
 MONO = "ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,'DejaVu Sans Mono',monospace"
 
 BG, PANE = "#04060b", "#070d16"
@@ -17,17 +21,32 @@ CYAN, WHITE = "#22d3ee", "#e6edf3"
 
 RAMP_INV = "@%#*+=-:. "
 
-PORT_X = 40
-INFO_X = 500
-PORTRAIT_FONT = 6.5
-PORTRAIT_ROW_STEP = 7.3
-FONT = 12
-INFO_STEP = 18
-TOP = 40
-PAD = 40
+PORTRAIT_ROWS = 58
+PORTRAIT_COLS = 81
 
-PORTRAIT_ROWS = 60
-PORTRAIT_COLS = 110
+Layout = namedtuple("Layout", [
+    "name", "width",
+    "portrait_x", "portrait_font", "portrait_row_step", "portrait_char_step",
+    "portrait_top",
+    "info_x", "info_font", "info_step", "max_chars",
+    "info_below", "gap", "pad",
+])
+
+WIDE = Layout(
+    name="wide", width=1200,
+    portrait_x=30, portrait_font=10, portrait_row_step=11, portrait_char_step=6.02,
+    portrait_top=40,
+    info_x=540, info_font=18, info_step=26, max_chars=58,
+    info_below=False, gap=0, pad=40,
+)
+
+NARROW = Layout(
+    name="narrow", width=600,
+    portrait_x=(600 - 81 * 6.62) / 2, portrait_font=11, portrait_row_step=12.1,
+    portrait_char_step=6.62, portrait_top=30,
+    info_x=30, info_font=21, info_step=30, max_chars=43,
+    info_below=True, gap=40, pad=40,
+)
 
 
 def _luma(r, g, b):
@@ -79,51 +98,112 @@ def uptime(since, today):
     )
 
 
-def _info_lines(stats, today):
-    return [
+def _wrapped(segments, value, color, layout):
+    """A key/leader prefix plus a value, wrapped at word boundaries.
+
+    Continuation lines are indented with spaces to the value column so the
+    card still reads as a two-column key/value table.
+    """
+    column = sum(len(seg[0]) for seg in segments)
+    chunks = textwrap.wrap(value, layout.max_chars - column) or [""]
+    lines = [segments + [(chunks[0], color)]]
+    for chunk in chunks[1:]:
+        lines.append([(" " * column + chunk, color)])
+    return lines
+
+
+def _kv(key, leader, value, layout, color=WHITE):
+    segments = [(key, CYAN)]
+    if leader:
+        segments.append((leader, MUTED))
+    return _wrapped(segments, value, color, layout)
+
+
+def _info_lines(stats, today, layout):
+    lines = [
         [("sharvin@streamwave", CYAN, 700)],
         [("------------------", MUTED)],
-        [("OS: ", CYAN), ("........... ", MUTED), ("macOS, Debian 13, Unraid", WHITE)],
-        [("Uptime: ", CYAN), ("....... ", MUTED), (uptime("2020-11-11", today), WHITE)],
-        [("Host: ", CYAN), ("......... ", MUTED), ("Streamwave home lab · OCI edge", WHITE)],
-        [("Kernel: ", CYAN), ("....... ", MUTED), ("AI Systems Engineer", WHITE)],
-        [("IDE: ", CYAN), (".......... ", MUTED), ("Claude Code, VS Code", WHITE)],
-        [],
-        [("Languages.Programming: ", CYAN), ("Go, Python, TypeScript, Rust, Kotlin", WHITE)],
-        [("Languages.Real: ", CYAN), ("....... ", MUTED), ("English, Malayalam", WHITE)],
-        [],
-        [("Hobbies: ", CYAN), ("...... ", MUTED),
-         ("Photography, Malayalam type design, Malayalam cinema", WHITE)],
-        [("Projects: ", CYAN), ("..... ", MUTED),
-         ("Astroid bot, Stellar Media Organizer, Foldpix, Thenmavu font", WHITE)],
-        [],
-        [("— Contact —", CYAN)],
-        [("Website: ", CYAN), ("...... ", MUTED), ("sharvinzlife.com", WHITE)],
-        [("Instagram: ", CYAN), (".... ", MUTED), ("sharvinzlife", WHITE)],
-        [("Facebook: ", CYAN), ("..... ", MUTED), ("sharvinzlife", WHITE)],
-        [],
-        [("— GitHub Stats —", CYAN)],
-        [("Repos: ", CYAN), ("........ ", MUTED), (f"{stats['repos']:,}", WHITE),
-         ("  |  ", MUTED), ("Stars: ", CYAN), ("...... ", MUTED), (f"{stats['stars']:,}", WHITE)],
-        [("Commits: ", CYAN), ("...... ", MUTED), (f"{stats['commits']:,}", WHITE),
-         ("  |  ", MUTED), ("Followers: ", CYAN), (".. ", MUTED),
-         (f"{stats['followers']:,}", WHITE)],
-        [("Lines of code:", CYAN), ("  ", MUTED), (f"{stats['loc']:,}", WHITE)],
     ]
+    lines += _kv("OS: ", "........... ", "macOS, Debian 13, Unraid", layout)
+    lines += _kv("Uptime: ", "....... ", uptime("2020-11-11", today), layout)
+    lines += _kv("Host: ", "......... ", "Streamwave home lab · OCI edge", layout)
+    lines += _kv("Kernel: ", "....... ", "AI Systems Engineer", layout)
+    lines += _kv("IDE: ", ".......... ", "Claude Code, VS Code", layout)
+    lines.append([])
+    lines += _wrapped(
+        [("Languages.Programming: ", CYAN)],
+        "Go, Python, TypeScript, Rust, Kotlin", WHITE, layout,
+    )
+    lines += _kv("Languages.Real: ", "....... ", "English, Malayalam", layout)
+    lines.append([])
+    lines += _kv(
+        "Hobbies: ", "...... ",
+        "Photography, Malayalam type design, Malayalam cinema", layout,
+    )
+    lines += _kv(
+        "Projects: ", "..... ",
+        "Astroid bot, Stellar Media Organizer, Foldpix, Thenmavu font", layout,
+    )
+    lines.append([])
+    lines.append([("— Contact —", CYAN)])
+    lines += _kv("Website: ", "...... ", "sharvinzlife.com", layout)
+    lines += _kv("Instagram: ", ".... ", "sharvinzlife", layout)
+    lines += _kv("Facebook: ", "..... ", "sharvinzlife", layout)
+    lines.append([])
+    lines.append([("— GitHub Stats —", CYAN)])
+    if layout.info_below:
+        lines += _kv("Repos: ", "........ ", f"{stats['repos']:,}", layout)
+        lines += _kv("Stars: ", "...... ", f"{stats['stars']:,}", layout)
+        lines += _kv("Commits: ", "...... ", f"{stats['commits']:,}", layout)
+        lines += _kv("Followers: ", ".. ", f"{stats['followers']:,}", layout)
+        lines += _kv("Lines of code:", "  ", f"{stats['loc']:,}", layout)
+    else:
+        lines.append([
+            ("Repos: ", CYAN), ("........ ", MUTED), (f"{stats['repos']:,}", WHITE),
+            ("  |  ", MUTED), ("Stars: ", CYAN), ("...... ", MUTED),
+            (f"{stats['stars']:,}", WHITE),
+        ])
+        lines.append([
+            ("Commits: ", CYAN), ("...... ", MUTED), (f"{stats['commits']:,}", WHITE),
+            ("  |  ", MUTED), ("Followers: ", CYAN), (".. ", MUTED),
+            (f"{stats['followers']:,}", WHITE),
+        ])
+        lines.append([
+            ("Lines of code:", CYAN), ("  ", MUTED), (f"{stats['loc']:,}", WHITE),
+        ])
+    return lines
 
 
-def build_svg(stats, today=date.today()):
+def _info_top(layout):
+    if layout.info_below:
+        return (
+            layout.portrait_top
+            + PORTRAIT_ROWS * layout.portrait_row_step
+            + layout.gap
+        )
+    return layout.portrait_top
+
+
+def _content_height(layout, info_count):
+    info_bottom = _info_top(layout) + info_count * layout.info_step
+    if layout.info_below:
+        return info_bottom
+    portrait_bottom = layout.portrait_top + PORTRAIT_ROWS * layout.portrait_row_step
+    return max(portrait_bottom, info_bottom)
+
+
+def build_svg(stats, layout=WIDE, today=date.today()):
     for key in ("repos", "commits", "stars", "followers", "loc"):
         if not isinstance(stats.get(key), int) or isinstance(stats.get(key), bool):
             raise ValueError(f"stats[{key!r}] must be an int")
 
-    info = _info_lines(stats, today)
-    content = max(PORTRAIT_ROWS * PORTRAIT_ROW_STEP, len(info) * INFO_STEP)
-    h = TOP + math.ceil(content) + PAD
+    info = _info_lines(stats, today, layout)
+    h = math.ceil(_content_height(layout, len(info))) + layout.pad
+    info_top = _info_top(layout)
 
     portrait_svg = []
     for i, row in enumerate(ascii_portrait()):
-        y = TOP + PORTRAIT_FONT + i * PORTRAIT_ROW_STEP
+        y = layout.portrait_top + layout.portrait_font + i * layout.portrait_row_step
         runs = []
         j = 0
         while j < len(row):
@@ -135,13 +215,14 @@ def build_svg(stats, today=date.today()):
             runs.append(f'<tspan fill="{col if col else "none"}">{chars}</tspan>')
             j = k
         portrait_svg.append(
-            f'<text x="{PORT_X}" y="{y}" font-family="{MONO}" font-size="{PORTRAIT_FONT}" '
+            f'<text x="{layout.portrait_x}" y="{y}" font-family="{MONO}" '
+            f'font-size="{layout.portrait_font}" '
             f'xml:space="preserve">{"".join(runs)}</text>'
         )
 
     styles, reduced, info_svg = [], [], []
     for j, segs in enumerate(info):
-        y = TOP + FONT + j * INFO_STEP
+        y = info_top + layout.info_font + j * layout.info_step
         styles.append(f".ln{j}{{animation:fade .5s ease {0.03 * j:.2f}s both}}")
         reduced.append(f".ln{j}{{animation:none;opacity:1}}")
         inner = "".join(
@@ -150,11 +231,11 @@ def build_svg(stats, today=date.today()):
             for s in segs
         )
         info_svg.append(
-            f'<text class="ln{j}" x="{INFO_X}" y="{y}" font-family="{MONO}" '
-            f'font-size="{FONT}" xml:space="preserve">{inner}</text>'
+            f'<text class="ln{j}" x="{layout.info_x}" y="{y}" font-family="{MONO}" '
+            f'font-size="{layout.info_font}" xml:space="preserve">{inner}</text>'
         )
 
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {h}" width="{W}" height="{h}" fill="none" role="img" aria-label="sharvin@streamwave neofetch card: ASCII portrait, stack, hobbies, contact and live GitHub stats.">
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {layout.width} {h}" width="{layout.width}" height="{h}" fill="none" role="img" aria-label="sharvin@streamwave neofetch card: ASCII portrait, stack, hobbies, contact and live GitHub stats.">
 <defs>
 <style>
   @keyframes fade{{from{{opacity:0}}to{{opacity:1}}}}
@@ -165,7 +246,7 @@ def build_svg(stats, today=date.today()):
 </style>
 </defs>
 
-<rect width="{W}" height="{h}" rx="6" fill="{BG}" stroke="{FRAME}"/>
+<rect width="{layout.width}" height="{h}" rx="6" fill="{BG}" stroke="{FRAME}"/>
 {"".join(portrait_svg)}
 {"".join(info_svg)}
 </svg>
@@ -175,10 +256,14 @@ def build_svg(stats, today=date.today()):
 def main():
     with open("assets/src/stats.json") as fh:
         stats = json.load(fh)
-    svg = build_svg(stats)
-    with open("assets/neofetch.svg", "w") as fh:
-        fh.write(svg)
-    print(f"wrote assets/neofetch.svg ({len(svg)} bytes)")
+    for layout, path in (
+        (WIDE, "assets/neofetch.svg"),
+        (NARROW, "assets/neofetch-narrow.svg"),
+    ):
+        svg = build_svg(stats, layout=layout)
+        with open(path, "w") as fh:
+            fh.write(svg)
+        print(f"wrote {path} ({len(svg)} bytes)")
 
 
 if __name__ == "__main__":

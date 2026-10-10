@@ -7,7 +7,7 @@ commit both the script and the SVG.
 python3 assets/src/gen_hero.py       # → assets/hero.svg
 python3 assets/src/gen_boot.py       # → assets/boot.svg
 python3 assets/src/gen_telemetry.py  # → assets/telemetry.svg
-python3 assets/src/gen_neofetch.py   # → assets/neofetch.svg
+python3 assets/src/gen_neofetch.py   # → assets/neofetch.svg, assets/neofetch-narrow.svg
 ```
 
 No dependencies — standard library only.
@@ -54,6 +54,9 @@ Re-measure before changing them.
 
 `fetch_stats.py` pulls repos, stars, followers, commits and lines of code through the
 authenticated `gh` CLI and writes `stats.json`; `gen_neofetch.py` turns that plus
-`portrait.ppm` into `assets/neofetch.svg`. Counts include **private** repositories —
+`portrait.ppm` into `assets/neofetch.svg` (wide) and `assets/neofetch-narrow.svg` (phones,
+selected by the README `<picture>` media query). Counts include **private** repositories —
 numbers only, no repo names. Commits = commits on the default branch of every owned repo
-(any author). A daily launchd job in `ops/` refreshes and commits the card.
+(any author). Lines of code fall back to a local-only cache at `~/.cache/profile-stats/loc.json`
+when GitHub's stats stay `202 not ready` past the retry budget. A daily launchd job in `ops/`
+refreshes and commits the card.
