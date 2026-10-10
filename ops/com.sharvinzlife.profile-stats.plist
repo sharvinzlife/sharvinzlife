@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.sharvinzlife.profile-stats</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>/Users/sharvin/.local/share/sharvinzlife-profile-stats/ops/refresh-stats.sh</string>
+		<string>/Users/sharvin/.local/share/sharvinzlife-profile-stats</string>
+	</array>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>6</integer>
+		<key>Minute</key>
+		<integer>10</integer>
+	</dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>/Users/sharvin/Library/Logs/profile-stats.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/sharvin/Library/Logs/profile-stats.log</string>
+</dict>
+</plist>

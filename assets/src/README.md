@@ -7,6 +7,7 @@ commit both the script and the SVG.
 python3 assets/src/gen_hero.py       # → assets/hero.svg
 python3 assets/src/gen_boot.py       # → assets/boot.svg
 python3 assets/src/gen_telemetry.py  # → assets/telemetry.svg
+python3 assets/src/gen_neofetch.py   # → assets/neofetch.svg
 ```
 
 No dependencies — standard library only.
@@ -48,3 +49,10 @@ Then render `/tmp/frozen.svg` in a browser. `-5.63s` lands on the hero's glitch 
 Public-only would report Python 71% / C# 8.9% / Java 7.2% and omit Go entirely, because
 the flagship Go and TypeScript repos are private — an accurate-but-misleading picture.
 Re-measure before changing them.
+
+## Where the neofetch stats come from
+
+`fetch_stats.py` pulls repos, stars, followers, commits and lines of code through the
+authenticated `gh` CLI and writes `stats.json`; `gen_neofetch.py` turns that plus
+`portrait.ppm` into `assets/neofetch.svg`. Counts include **private** repositories —
+numbers only, no repo names. A daily launchd job in `ops/` refreshes and commits the card.

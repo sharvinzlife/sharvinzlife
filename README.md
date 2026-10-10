@@ -1,11 +1,8 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/sharvinzlife/sharvinzlife/main/assets/hero.svg" width="100%" alt="Jose Sharvin — AI Systems Engineer. Multi-model orchestration, MCP tool-calling, RAG, self-hosted inference." />
+<img src="https://raw.githubusercontent.com/sharvinzlife/sharvinzlife/main/assets/neofetch.svg" width="100%" alt="sharvin@streamwave — neofetch-style card: ASCII portrait, stack, hobbies, contact and live GitHub stats." />
 
 </div>
-
-<img src="https://raw.githubusercontent.com/sharvinzlife/sharvinzlife/main/assets/boot.svg" width="100%" alt="SHARVIN.OS boot sequence — stack, LLM routing, local inference, protocols and infra." />
-
 <br/>
 
 ## `[ 02 ] // WHAT I ACTUALLY DO`
